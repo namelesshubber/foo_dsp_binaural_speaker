@@ -59,29 +59,6 @@ The effect works only near the sweet spot (centred, ears level with the speakers
 toed in towards you) and in a room with limited early reflections. Leave some headroom
 (e.g. ReplayGain or a limiter after this DSP) as the filters can raise peaks.
 
-## Building with GitHub Actions (no local tools needed)
-
-1. Create a free account at <https://github.com> and click **New repository**
-   (name it e.g. `foo_dsp_cmss3d`, any visibility).
-2. Upload the *contents* of this folder (`src/`, `tests/`, `.github/`, `README.md`, ...) with
-   **Add file -> Upload files**. Make sure the hidden `.github/workflows/build.yml` is included
-   (drag the whole folder tree, or use `git` if you prefer).
-3. Open the **Actions** tab, enable workflows if asked, and select **Build foo_dsp_cmss3d**.
-   The build starts automatically on every push; you can also press **Run workflow**.
-4. When both jobs are green, open the run and download the artifact
-   **foo_dsp_cmss3d-component** (contains `foo_dsp_cmss3d.fb2k-component`, 32-bit and 64-bit).
-   The individual DLLs are in `dll-Win32` and `dll-x64`.
-5. Optional: pushing a tag such as `v0.1.0` also attaches the component to a GitHub Release.
-
-**SDK download.** The workflow downloads the foobar2000 SDK from foobar2000.org. If that fails
-(or a newer SDK is available) download the `.7z` from <https://www.foobar2000.org/SDK> in your
-browser and upload it to the repository root as **`sdk.7z`**; the workflow prefers it. To use a
-different SDK version permanently, edit `SDK_URL_1` in `.github/workflows/build.yml`.
-
-**If the build fails:** open the failed step, copy the log and share it. The "Locate SDK
-projects" step prints every SDK project/library file it can see, which makes path differences
-between SDK versions easy to fix (the SDK layout is discovered, not hard-coded).
-
 ## Installing
 
 * Double-click `foo_dsp_cmss3d.fb2k-component`, or in foobar2000 go to
@@ -91,9 +68,6 @@ between SDK versions easy to fix (the SDK layout is discovered, not hard-coded).
   into `<profile>\user-components-x64\foo_dsp_cmss3d\` for 64-bit foobar2000.
 * Preferences -> Playback -> DSP Manager: add **Speaker Virtualizer (CMSS-3D Virtual style)**
   *after* your Dolby Headphone wrapper, then use the configure button.
-
-The DLL uses the dynamic C runtime (/MD), like the foobar2000 SDK libraries, and a Windows 7 target level.
-foobar2000 provides the Visual C++ runtime to its components.
 
 ## What is publicly known about CMSS-3D Virtual
 
@@ -111,15 +85,6 @@ generalised transaural stereo, Brown & Duda (1998) structural head model, and ma
 HRTF + crosstalk-cancellation virtualizers (for example US 6,009,178, US 8,155,323, US 7,974,418, US 8,050,433).
 This project implements that general technique with its own code. It is provided for personal use
 and is not legal advice regarding any patent.
-
-**Wrapping the original CMSS-3D is not realistic:** it lives inside Creative's drivers/DSP
-hardware and is not exposed as a redistributable library, so there is nothing to wrap.
-
-## Possible improvements
-
-* Optional measured HRIR/SOFA data instead of the analytic head model.
-* Per-listener tweaks (asymmetric seating), bass management for the Side channel.
-* Built-in stereo-to-binaural stage for non-Dolby-Headphone material.
 
 ## License
 
