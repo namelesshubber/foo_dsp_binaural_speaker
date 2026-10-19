@@ -92,8 +92,8 @@ between SDK versions easy to fix (the SDK layout is discovered, not hard-coded).
 * Preferences -> Playback -> DSP Manager: add **Speaker Virtualizer (CMSS-3D Virtual style)**
   *after* your Dolby Headphone wrapper, then use the configure button.
 
-The DLL is built with the static runtime (/MT), a Windows 7 target level and no dependency on
-newer Windows APIs, so it is intended to load on Windows 7 as well.
+The DLL uses the dynamic C runtime (/MD), like the foobar2000 SDK libraries, and a Windows 7 target level.
+foobar2000 provides the Visual C++ runtime to its components.
 
 ## What is publicly known about CMSS-3D Virtual
 
