@@ -16,7 +16,7 @@
 
 DECLARE_COMPONENT_VERSION(
     "Speaker Virtualizer (CMSS-3D Virtual style)",
-    "0.2.0",
+    "0.3.0",
     "Crosstalk canceller (transaural stage) for playing binaural stereo\n"
     "material, such as Dolby Headphone output, over two loudspeakers.\n\n"
     "Uses a rigid-sphere head model (exact diffraction series, or the classic\n"
@@ -103,6 +103,7 @@ void writeControls(HWND dlg, const ctc::Params& p) {
     setSlider(dlg, IDC_SL_HEAD, 70, 100, static_cast<int>(std::lround(p.headRadiusMm)));
     setSlider(dlg, IDC_SL_REG, 0, 300, static_cast<int>(std::lround((std::log10(p.regularization) + 3.0) * 100.0)));
     setSlider(dlg, IDC_SL_BOOST, 0, 20, static_cast<int>(std::lround(p.maxBoostDb)));
+    setSlider(dlg, IDC_SL_LOW, 0, 50, static_cast<int>(std::lround(p.cancelMinHz / 10.0)));
     setSlider(dlg, IDC_SL_FREQ, 20, 140, static_cast<int>(std::lround(p.cancelMaxHz / 100.0)));
     setSlider(dlg, IDC_SL_GAIN, 0, 36, static_cast<int>(std::lround((p.outputGainDb + 12.0) * 2.0)));
     CheckDlgButton(dlg, IDC_CHK_AUTO, p.autoLevel ? BST_CHECKED : BST_UNCHECKED);
@@ -114,6 +115,7 @@ void readControls(HWND dlg, ctc::Params& p) {
     p.headRadiusMm = getSlider(dlg, IDC_SL_HEAD);
     p.regularization = std::pow(10.0, -3.0 + getSlider(dlg, IDC_SL_REG) / 100.0);
     p.maxBoostDb = getSlider(dlg, IDC_SL_BOOST);
+    p.cancelMinHz = getSlider(dlg, IDC_SL_LOW) * 10.0;
     p.cancelMaxHz = getSlider(dlg, IDC_SL_FREQ) * 100.0;
     p.outputGainDb = getSlider(dlg, IDC_SL_GAIN) / 2.0 - 12.0;
     p.autoLevel = IsDlgButtonChecked(dlg, IDC_CHK_AUTO) == BST_CHECKED;
@@ -131,6 +133,11 @@ void updateLabels(HWND dlg, const ctc::Params& p) {
     SetDlgItemTextW(dlg, IDC_TX_REG, buf);
     swprintf_s(buf, L"%.0f dB", p.maxBoostDb);
     SetDlgItemTextW(dlg, IDC_TX_BOOST, buf);
+    if (p.cancelMinHz <= 0.0)
+        swprintf_s(buf, L"off");
+    else
+        swprintf_s(buf, L"%.0f Hz", p.cancelMinHz);
+    SetDlgItemTextW(dlg, IDC_TX_LOW, buf);
     swprintf_s(buf, L"%.1f kHz", p.cancelMaxHz / 1000.0);
     SetDlgItemTextW(dlg, IDC_TX_FREQ, buf);
     swprintf_s(buf, L"%+.1f dB", p.outputGainDb);

@@ -18,6 +18,7 @@ void sanitize(Params& p) {
     p.headRadiusMm        = clampd(p.headRadiusMm, 70.0, 100.0);
     p.regularization      = clampd(p.regularization, 0.001, 1.0);
     p.maxBoostDb          = clampd(p.maxBoostDb, 0.0, 20.0);
+    p.cancelMinHz         = clampd(p.cancelMinHz, 0.0, 500.0);
     p.cancelMaxHz         = clampd(p.cancelMaxHz, 2000.0, 14000.0);
     p.outputGainDb        = clampd(p.outputGainDb, -12.0, 6.0);
 }
@@ -139,6 +140,17 @@ static double fadeWeight(double f, double fc) {
     return 0.5 * (1.0 + std::cos(kPi * t));
 }
 
+// 0 below fc/sqrt2, 1 above fc*sqrt2, raised-cosine in log-frequency in between.
+// fc <= 0 disables the limit (always 1).
+static double fadeWeightLow(double f, double fc) {
+    if (fc <= 0.0) return 1.0;
+    const double lo = fc / 1.41421356237, hi = fc * 1.41421356237;
+    if (f <= lo) return 0.0;
+    if (f >= hi) return 1.0;
+    const double t = std::log(f / lo) / std::log(hi / lo);
+    return 0.5 * (1.0 - std::cos(kPi * t));
+}
+
 static cd limitGain(cd g, double cap) {
     const double m = std::abs(g);
     return m > cap ? g * (cap / m) : g;
@@ -200,23 +212,31 @@ Design designFilters(const Params& pin, double fs) {
         cd b = std::conj(hd) / (std::norm(hd) + p.regularization);
         a = limitGain(a, cap);
         b = limitGain(b, cap);
+        // The final filters are minimum-phase and built from the magnitude only, so the band
+        // limits are blended on magnitudes (blending complex values with different phases would
+        // create notches in the transition regions).
         const double w = fadeWeight(f, p.cancelMaxHz);
-        a = w * a + (1.0 - w) * cd(1.0, 0.0);
-        b = w * b + (1.0 - w) * cd(1.0, 0.0);
-        gs[k] = a;
-        gd[k] = b;
+        const double am = w * std::abs(a) + (1.0 - w);
+        const double bm = w * std::abs(b) + (1.0 - w);
+        gs[k] = cd(am, 0.0);
+        gd[k] = cd(bm, 0.0);
         if (f >= 200.0 && f <= 8000.0) {
             const double lw = 1.0 / f;  // log-frequency weighting
-            accum += lw * 0.5 * (std::norm(a) + std::norm(b));
+            accum += lw * 0.5 * (am * am + bm * bm);
             wsum += lw;
         }
     }
 
     double scale = std::pow(10.0, p.outputGainDb / 20.0);
     if (p.autoLevel && wsum > 0.0 && accum > 1e-12) scale /= std::sqrt(accum / wsum);
+
+    // Lower limit: below it the filters fade back to unity (plain stereo, same bass as with the
+    // DSP off). Applied after the level normalisation so it does not change the auto level.
     for (int k = 0; k <= half; ++k) {
-        gs[k] *= scale;
-        gd[k] *= scale;
+        const double f = k * fs / nfft;
+        const double wl = fadeWeightLow(f, p.cancelMinHz);
+        gs[k] = wl * (gs[k] * scale) + (1.0 - wl) * cd(1.0, 0.0);
+        gd[k] = wl * (gd[k] * scale) + (1.0 - wl) * cd(1.0, 0.0);
     }
 
     Design d;

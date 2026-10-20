@@ -34,6 +34,7 @@ struct Params {
     double headRadiusMm        = 87.5;  // average adult head radius
     double regularization      = 0.02;  // Tikhonov beta; larger = safer/weaker cancellation
     double maxBoostDb          = 12.0;  // hard cap on the gain of each canceller filter
+    double cancelMinHz         = 150.0; // below this the canceller fades back to plain stereo (0 = off)
     double cancelMaxHz         = 8000.0;// canceller fades out around this frequency (one octave wide)
     double outputGainDb        = 0.0;   // extra trim
     bool   autoLevel           = true;  // normalise average in-band power gain to 0 dB

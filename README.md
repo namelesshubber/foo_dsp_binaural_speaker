@@ -43,10 +43,12 @@ The Mid/Side transform diagonalises it, so the inverse is two filters:
   Compared with the exact sphere at a 15 deg speaker half-angle, its interaural delay is within about
   25 us up to 3 kHz and its level difference within about 2 dB, so it is a good approximation, but the
   mismatch costs cancellation depth when the real head behaves like the sphere.
- The inversion is Tikhonov-regularised, boost-limited and fades out above a configurable frequency,
-because cancellation is only reliable at low and mid frequencies.
-The resulting filters are minimum-phase FIRs (zero added latency, about 10 ms of taps,
-256-1024 taps depending on sample rate) designed with an FFT/cepstrum method.
+ The inversion is Tikhonov-regularised,
+boost-limited and limited to a frequency band: it fades out above a configurable upper frequency
+(cancellation is only reliable at low and mid frequencies) and fades back to plain stereo below a
+configurable lower frequency (at very long wavelengths the two speakers add up in the room and the
+crosstalk cannot be cancelled, so the filter would only change the bass level without any benefit). The resulting filters are minimum-phase FIRs (zero added latency,
+about 10 ms of taps, 256-1024 taps depending on sample rate) designed with an FFT/cepstrum method.
 
 `tests/test_core.cpp` checks the maths offline: with weak regularisation the simulated channel
 separation at the ears is 20-55 dB between 400 Hz and 7 kHz.
@@ -60,6 +62,7 @@ separation at the ears is 20-55 dB between 400 Hz and 7 kHz.
 | Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model, as in v0.1. Presets saved with v0.1 keep the classic model. |
 | Regularization | Higher = safer, less coloured, weaker cancellation. Lower = stronger effect, more colouration. |
 | Max filter boost | Hard cap on the gain of each canceller filter. |
+| Canceller lower limit | Below this frequency (default 150 Hz, one octave wide transition) the filters fade back to unity, so the bass is the same as with the DSP switched off. 0 = off (cancel down to DC, as in v0.1/v0.2). |
 | Canceller upper limit | Cancellation fades out around this frequency (one octave wide transition). |
 | Output gain / Auto level | Level compensation. Auto level normalises the average 200 Hz-8 kHz power gain to 0 dB. |
 
@@ -97,6 +100,14 @@ J. Acoust. Soc. Am. 135, 817-823) for the Woodworth/rigid-sphere analysis, and m
 HRTF + crosstalk-cancellation virtualizers (for example US 6,009,178, US 8,155,323, US 7,974,418, US 8,050,433).
 This project implements that general technique with its own code. It is provided for personal use
 and is not legal advice regarding any patent.
+
+## Changelog
+
+* **0.3** - Canceller lower limit (fades back to plain stereo at low frequencies). Band limits are now
+  blended on magnitudes, which avoids notches in the transition regions. Presets from 0.1/0.2 load
+  with the lower limit off, so they sound as before.
+* **0.2** - Exact rigid-sphere head model (default) with a switch back to the classic model.
+* **0.1** - First release (Woodworth + Brown/Duda head model).
 
 ## License
 

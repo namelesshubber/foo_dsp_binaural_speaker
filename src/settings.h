@@ -10,9 +10,12 @@
 
 namespace settings {
 
+static const int32_t kMagic = 0x31435443;  // "CTC1" little endian
+
+// Current layout (version 3).
 struct Blob {
     int32_t magic;      // 'CTC1'
-    int32_t version;    // 1
+    int32_t version;    // 3
     int32_t angle100;   // speaker half angle, 0.01 deg
     int32_t head100;    // head radius, 0.01 mm
     int32_t reg1e6;     // regularisation * 1e6
@@ -20,21 +23,23 @@ struct Blob {
     int32_t freq;       // canceller upper frequency, Hz
     int32_t gain100;    // output gain, 0.01 dB
     int32_t autoLevel;  // 0/1
-    int32_t exact;      // 0 = Woodworth + Brown/Duda, 1 = exact rigid sphere (added in version 2)
+    int32_t exact;      // 0 = Woodworth + Brown/Duda, 1 = exact rigid sphere
+    int32_t minFreq;    // canceller lower frequency, Hz (0 = off)
 };
 
-// Version 1 layout (before the model switch existed); still readable.
-struct BlobV1 {
+// Older layouts, still readable.
+struct BlobV2 {  // version 2: no lower limit
+    int32_t magic, version, angle100, head100, reg1e6, boost100, freq, gain100, autoLevel, exact;
+};
+struct BlobV1 {  // version 1: no model switch, no lower limit
     int32_t magic, version, angle100, head100, reg1e6, boost100, freq, gain100, autoLevel;
 };
-
-static const int32_t kMagic = 0x31435443;  // "CTC1" little endian
 
 inline int32_t toFix(double v, double scale) { return static_cast<int32_t>(std::lround(v * scale)); }
 
 inline void toBlob(const ctc::Params& p, Blob& b) {
     b.magic = kMagic;
-    b.version = 2;
+    b.version = 3;
     b.angle100 = toFix(p.speakerHalfAngleDeg, 100.0);
     b.head100 = toFix(p.headRadiusMm, 100.0);
     b.reg1e6 = toFix(p.regularization, 1e6);
@@ -43,22 +48,32 @@ inline void toBlob(const ctc::Params& p, Blob& b) {
     b.gain100 = toFix(p.outputGainDb, 100.0);
     b.autoLevel = p.autoLevel ? 1 : 0;
     b.exact = p.exactSphere ? 1 : 0;
+    b.minFreq = toFix(p.cancelMinHz, 1.0);
 }
 
 // Returns false (and leaves p untouched) if the data is not a valid blob.
+// Presets saved by older versions keep the behaviour they were tuned with:
+// v1 -> classic model, no lower limit; v2 -> no lower limit.
 inline bool fromBlob(const void* data, std::size_t size, ctc::Params& p) {
     if (!data) return false;
     Blob b;
     std::memset(&b, 0, sizeof(b));
     if (size == sizeof(Blob)) {
         std::memcpy(&b, data, sizeof(b));
-        if (b.magic != kMagic || b.version != 2) return false;
+        if (b.magic != kMagic || b.version != 3) return false;
+    } else if (size == sizeof(BlobV2)) {
+        BlobV2 o;
+        std::memcpy(&o, data, sizeof(o));
+        if (o.magic != kMagic || o.version != 2) return false;
+        std::memcpy(&b, &o, sizeof(o));
+        b.minFreq = 0;
     } else if (size == sizeof(BlobV1)) {
         BlobV1 o;
         std::memcpy(&o, data, sizeof(o));
         if (o.magic != kMagic || o.version != 1) return false;
         std::memcpy(&b, &o, sizeof(o));
-        b.exact = 0;  // presets saved by v0.1 keep the model they were tuned with
+        b.exact = 0;
+        b.minFreq = 0;
     } else {
         return false;
     }
@@ -67,6 +82,7 @@ inline bool fromBlob(const void* data, std::size_t size, ctc::Params& p) {
     p.regularization = b.reg1e6 / 1e6;
     p.maxBoostDb = b.boost100 / 100.0;
     p.cancelMaxHz = static_cast<double>(b.freq);
+    p.cancelMinHz = static_cast<double>(b.minFreq);
     p.outputGainDb = b.gain100 / 100.0;
     p.autoLevel = b.autoLevel != 0;
     p.exactSphere = b.exact != 0;

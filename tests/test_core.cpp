@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ctc_core.h"
+#include "settings.h"
 
 typedef std::complex<double> cd;
 
@@ -34,6 +35,39 @@ static void report(const char* title, const ctc::Params& p, double fs) {
     }
 }
 
+// Level seen by the ears for a MONO signal (both channels equal), relative to DSP off.
+// DSP off: ears get (Hi+Hc). DSP on: ears get (Hi+Hc)*Gmid.
+static void lowFreqReport(const char* title, const ctc::Params& p, double fs) {
+    ctc::Design d = ctc::designFilters(p, fs);
+    std::printf("\n== %s: mono-bass level at ears vs DSP off ==\n", title);
+    for (double f : {30.0, 50.0, 80.0, 100.0, 150.0, 200.0, 300.0, 500.0, 1000.0}) {
+        cd hi, hc;
+        ctc::headModel(p, f, hi, hc);
+        cd g = response(d.mid, f, fs);
+        std::printf("  %6.0f Hz  %6.2f dB   (Gmid=%6.2f dB, Gside=%6.2f dB)\n", f, 20 * std::log10(std::abs(g)),
+                    20 * std::log10(std::abs(g)), 20 * std::log10(std::abs(response(d.side, f, fs))));
+    }
+}
+
+static int blobTests() {
+    int bad = 0;
+    ctc::Params p;
+    p.cancelMinHz = 220; p.exactSphere = false; p.speakerHalfAngleDeg = 22.5;
+    settings::Blob b; settings::toBlob(p, b);
+    ctc::Params q;
+    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerHalfAngleDeg != 22.5) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
+    settings::BlobV2 v2; std::memcpy(&v2, &b, sizeof(v2)); v2.version = 2;
+    ctc::Params r;
+    if (!settings::fromBlob(&v2, sizeof(v2), r) || r.cancelMinHz != 0) { std::printf("blob v2 read FAILED\n"); ++bad; }
+    settings::BlobV1 v1; std::memcpy(&v1, &b, sizeof(v1)); v1.version = 1;
+    ctc::Params s;
+    if (!settings::fromBlob(&v1, sizeof(v1), s) || s.cancelMinHz != 0 || s.exactSphere) { std::printf("blob v1 read FAILED\n"); ++bad; }
+    char junk[7] = {0};
+    if (settings::fromBlob(junk, sizeof(junk), s)) { std::printf("junk blob accepted FAILED\n"); ++bad; }
+    std::printf("\nblob tests: %s\n", bad ? "FAILED" : "ok");
+    return bad;
+}
+
 int main() {
     ctc::Params def;                 // exact sphere model (default)
     report("default, exact sphere", def, 48000.0);
@@ -48,6 +82,13 @@ int main() {
     report("strong (beta=0.001, no cap)", strong, 48000.0);
     report("default @44.1k", def, 44100.0);
     report("default @192k", def, 192000.0);
+
+    {
+        ctc::Params off = def; off.cancelMinHz = 0;
+        lowFreqReport("lower limit OFF", off, 48000.0);
+        lowFreqReport("lower limit 150 Hz (default)", def, 48000.0);
+    }
+    if (blobTests()) return 1;
 
     // Stability + speed test.
     ctc::Engine e;
