@@ -98,9 +98,6 @@ HRTF + crosstalk-cancellation virtualizers (for example US 6,009,178, US 8,155,3
 This project implements that general technique with its own code. It is provided for personal use
 and is not legal advice regarding any patent.
 
-**Wrapping the original CMSS-3D is not realistic:** it lives inside Creative's drivers/DSP
-hardware and is not exposed as a redistributable library, so there is nothing to wrap.
-
 ## License
 
 MIT for the code in this repository (see `LICENSE`). The foobar2000 SDK is downloaded separately
