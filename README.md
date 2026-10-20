@@ -39,6 +39,10 @@ The Mid/Side transform diagonalises it, so the inverse is two filters:
 
 * **Exact rigid sphere (default since v0.2):** the Rayleigh partial-wave series for a plane wave on a
   rigid sphere (Aaronson & Hartmann 2014, Eq. 2), evaluated at the two ear positions (ear axis at 100 deg).
+  Since v0.4 the speakers are treated as point sources at their real distance (Duda & Martens 1998), so the
+  level and phase difference between the ears at low frequencies follows the distance you enter. At 200 Hz the
+  contralateral/ipsilateral level ratio is about -0.7 dB at 1 m and -1.7 dB at 40 cm, compared with 0 dB for a
+  plane wave; that matters because the cancellation depends on small differences there.
 * **Classic:** Woodworth interaural time difference plus the Brown & Duda head-shadow filter.
   Compared with the exact sphere at a 15 deg speaker half-angle, its interaural delay is within about
   25 us up to 3 kHz and its level difference within about 2 dB, so it is a good approximation, but the
@@ -57,7 +61,8 @@ separation at the ears is 20-55 dB between 400 Hz and 7 kHz.
 
 | Setting | Meaning |
 |---|---|
-| Speaker half-angle | Half of the angle between your speakers as seen from your seat. Desktop speakers: 8-15 deg. Living room: 25-30 deg. Narrower = stronger effect but more bass/colour risk. |
+| Speaker spacing | Distance between the two speakers (centre to centre of the drivers), in cm. |
+| Listening distance | Distance from your head to the line joining the two speakers, in cm. Spacing and distance give the speaker half-angle (shown in the dialog) and the head-to-speaker distance. Typical desktop: 50 cm spacing at 60-70 cm (about 20-25 deg half-angle). Living room: 200 cm at 200 cm (45 deg). A narrower angle gives a stronger effect but more bass/colour risk. |
 | Head radius | Head size for the model (default 87.5 mm). |
 | Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model, as in v0.1. Presets saved with v0.1 keep the classic model. |
 | Regularization | Higher = safer, less coloured, weaker cancellation. Lower = stronger effect, more colouration. |
@@ -103,6 +108,8 @@ and is not legal advice regarding any patent.
 
 ## Changelog
 
+* **0.4** - Speaker spacing and listening distance replace the half-angle control; the exact sphere model now uses
+  point sources at the real distance. Presets from 0.1-0.3 load with the angle converted to a spacing at a 1 m distance.
 * **0.3** - Canceller lower limit (fades back to plain stereo at low frequencies). Band limits are now
   blended on magnitudes, which avoids notches in the transition regions. Presets from 0.1/0.2 load
   with the lower limit off, so they sound as before.

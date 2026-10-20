@@ -13,8 +13,19 @@ static const double kSpeedOfSound = 343.0;  // m/s
 
 static double clampd(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+double halfAngleDeg(const Params& p) {
+    const double deg = std::atan((p.speakerSpacingCm * 0.5) / p.listenDistanceCm) * 180.0 / kPi;
+    return clampd(deg, 3.0, 60.0);
+}
+
+double sourceDistanceM(const Params& p) {
+    const double h = p.speakerSpacingCm * 0.5;
+    return std::sqrt(h * h + p.listenDistanceCm * p.listenDistanceCm) * 0.01;
+}
+
 void sanitize(Params& p) {
-    p.speakerHalfAngleDeg = clampd(p.speakerHalfAngleDeg, 3.0, 60.0);
+    p.speakerSpacingCm    = clampd(p.speakerSpacingCm, 10.0, 500.0);
+    p.listenDistanceCm    = clampd(p.listenDistanceCm, 25.0, 800.0);
     p.headRadiusMm        = clampd(p.headRadiusMm, 70.0, 100.0);
     p.regularization      = clampd(p.regularization, 0.001, 1.0);
     p.maxBoostDb          = clampd(p.maxBoostDb, 0.0, 20.0);
@@ -36,22 +47,31 @@ static cd shadow(double omega, double a_m, double incidenceDeg) {
 }
 
 
+// Spherical Hankel functions of the second kind h_n(x) = j_n(x) - i*y_n(x), n = 0..count-1,
+// by the upward recurrence (stable for the Hankel function because the y_n part grows with n).
+static void hankelSeq(double x, int count, std::vector<cd>& h) {
+    h.assign(static_cast<std::size_t>(count) + 2, cd(0.0, 0.0));
+    const double s = std::sin(x), co = std::cos(x);
+    h[0] = cd(s / x, co / x);                                   // j0 - i*y0, y0 = -cos x / x
+    h[1] = cd(s / (x * x) - co / x, co / (x * x) + s / x);      // j1 - i*y1, y1 = -cos x/x^2 - sin x/x
+    for (int n = 1; n < count; ++n) h[n + 1] = (2.0 * n + 1.0) / x * h[n] - h[n - 1];
+}
+
+static int seriesTerms(double x) {
+    int N = static_cast<int>(x + 4.0 * std::cbrt(x) + 10.0);
+    return N > 150 ? 150 : N;
+}
+
 // Rayleigh series for the pressure on a rigid sphere hit by a plane wave:
 //   p(theta)/p0 = 1/(ka)^2 * sum_n i^(n+1) (2n+1) P_n(cos theta) / h_n'(ka),  h_n = spherical Hankel (2nd kind)
-// h_n is generated with the upward recurrence, which is stable for the Hankel function because
-// the y_n part grows with n.
 cd sphereExact(double f, double thetaDeg, double radius) {
     const double fEval = std::max(f, 20.0);  // avoid x -> 0 at DC
     const double x = 2.0 * kPi * fEval * radius / kSpeedOfSound;
     const double ct = std::cos(thetaDeg * kPi / 180.0);
-    int N = static_cast<int>(x + 4.0 * std::cbrt(x) + 10.0);
-    if (N > 150) N = 150;
+    const int N = seriesTerms(x);
 
-    std::vector<cd> h(static_cast<std::size_t>(N) + 2);
-    const double s = std::sin(x), co = std::cos(x);
-    h[0] = cd(s / x, co / x);                                   // j0 - i*y0, y0 = -cos x / x
-    h[1] = cd(s / (x * x) - co / x, co / (x * x) + s / x);      // j1 - i*y1, y1 = -cos x/x^2 - sin x/x
-    for (int n = 1; n <= N; ++n) h[n + 1] = (2.0 * n + 1.0) / x * h[n] - h[n - 1];
+    std::vector<cd> h;
+    hankelSeq(x, N + 1, h);
 
     cd sum(0.0, 0.0);
     double pPrev = 1.0, pCur = ct;  // P0, P1
@@ -70,17 +90,47 @@ cd sphereExact(double f, double thetaDeg, double radius) {
     return sum / (x * x);
 }
 
+// Point source at distance r (>= radius):
+//   H = (kr/(ka)^2) e^{j k r} * sum_n (2n+1) P_n(cos theta) h_n(kr) / h_n'(ka)
+cd spherePoint(double f, double thetaDeg, double radius, double dist) {
+    const double fEval = std::max(f, 20.0);
+    const double k = 2.0 * kPi * fEval / kSpeedOfSound;
+    const double x = k * radius;
+    const double xr = k * std::max(dist, radius * 1.05);
+    const double ct = std::cos(thetaDeg * kPi / 180.0);
+    const int N = seriesTerms(x);
+
+    std::vector<cd> h, hr;
+    hankelSeq(x, N + 1, h);
+    hankelSeq(xr, N + 1, hr);
+
+    cd sum(0.0, 0.0);
+    double pPrev = 1.0, pCur = ct;
+    for (int n = 0; n <= N; ++n) {
+        const double pn = (n == 0) ? 1.0 : (n == 1 ? ct : pCur);
+        const cd hp = (n == 0) ? -h[1] : h[n - 1] - (n + 1.0) / x * h[n];
+        sum += (2.0 * n + 1.0) * pn * hr[n] / hp;
+        if (n >= 1) {
+            const double pNext = ((2.0 * n + 1.0) * ct * pCur - n * pPrev) / (n + 1.0);
+            pPrev = pCur;
+            pCur = pNext;
+        }
+    }
+    return sum * (xr / (x * x)) * std::exp(cd(0.0, xr));
+}
+
 void headModel(const Params& p, double f, cd& hi, cd& hc) {
     const double a = p.headRadiusMm * 1e-3;
-    const double phi = p.speakerHalfAngleDeg;
+    const double phi = halfAngleDeg(p);
     const double omega = 2.0 * kPi * f;
     const double earAxis = 100.0;  // ears sit at +/-100 degrees on the head axis
 
     if (p.exactSphere) {
         // Right speaker at +phi: ipsilateral ear is earAxis-phi away from the source direction,
         // contralateral ear is earAxis+phi away.
-        hi = sphereExact(f, earAxis - phi, a);
-        hc = sphereExact(f, earAxis + phi, a);
+        const double r = sourceDistanceM(p);
+        hi = spherePoint(f, earAxis - phi, a, r);
+        hc = spherePoint(f, earAxis + phi, a, r);
         return;
     }
 

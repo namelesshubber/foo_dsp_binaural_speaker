@@ -3,7 +3,8 @@
 
 #define IDD_CONFIG        101
 
-#define IDC_SL_ANGLE      1001
+#define IDC_SL_SPACING    1001
+#define IDC_SL_DIST       1008
 #define IDC_SL_HEAD       1002
 #define IDC_SL_REG        1003
 #define IDC_SL_BOOST      1004
@@ -11,7 +12,8 @@
 #define IDC_SL_GAIN       1006
 #define IDC_SL_LOW        1007
 
-#define IDC_TX_ANGLE      1101
+#define IDC_TX_SPACING    1101
+#define IDC_TX_DIST       1108
 #define IDC_TX_HEAD       1102
 #define IDC_TX_REG        1103
 #define IDC_TX_BOOST      1104
@@ -22,3 +24,4 @@
 #define IDC_CHK_AUTO      1201
 #define IDC_BTN_RESET     1202
 #define IDC_CHK_EXACT     1203
+#define IDC_TX_GEOM       1204

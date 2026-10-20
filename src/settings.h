@@ -12,11 +12,12 @@ namespace settings {
 
 static const int32_t kMagic = 0x31435443;  // "CTC1" little endian
 
-// Current layout (version 3).
+// Current layout (version 4).
 struct Blob {
     int32_t magic;      // 'CTC1'
-    int32_t version;    // 3
-    int32_t angle100;   // speaker half angle, 0.01 deg
+    int32_t version;    // 4
+    int32_t spacingMm;  // distance between the speakers, mm
+    int32_t distMm;     // listening distance, mm
     int32_t head100;    // head radius, 0.01 mm
     int32_t reg1e6;     // regularisation * 1e6
     int32_t boost100;   // max boost, 0.01 dB
@@ -27,7 +28,10 @@ struct Blob {
     int32_t minFreq;    // canceller lower frequency, Hz (0 = off)
 };
 
-// Older layouts, still readable.
+// Older layouts, still readable. They stored the speaker half-angle instead of spacing + distance.
+struct BlobV3 {  // version 3
+    int32_t magic, version, angle100, head100, reg1e6, boost100, freq, gain100, autoLevel, exact, minFreq;
+};
 struct BlobV2 {  // version 2: no lower limit
     int32_t magic, version, angle100, head100, reg1e6, boost100, freq, gain100, autoLevel, exact;
 };
@@ -39,8 +43,9 @@ inline int32_t toFix(double v, double scale) { return static_cast<int32_t>(std::
 
 inline void toBlob(const ctc::Params& p, Blob& b) {
     b.magic = kMagic;
-    b.version = 3;
-    b.angle100 = toFix(p.speakerHalfAngleDeg, 100.0);
+    b.version = 4;
+    b.spacingMm = toFix(p.speakerSpacingCm, 10.0);
+    b.distMm = toFix(p.listenDistanceCm, 10.0);
     b.head100 = toFix(p.headRadiusMm, 100.0);
     b.reg1e6 = toFix(p.regularization, 1e6);
     b.boost100 = toFix(p.maxBoostDb, 100.0);
@@ -53,31 +58,39 @@ inline void toBlob(const ctc::Params& p, Blob& b) {
 
 // Returns false (and leaves p untouched) if the data is not a valid blob.
 // Presets saved by older versions keep the behaviour they were tuned with:
-// v1 -> classic model, no lower limit; v2 -> no lower limit.
+// v1 -> classic model, no lower limit; v2 -> no lower limit; v1-v3 -> the stored half-angle is
+// converted to a speaker spacing at a listening distance of 1 m.
 inline bool fromBlob(const void* data, std::size_t size, ctc::Params& p) {
     if (!data) return false;
     Blob b;
     std::memset(&b, 0, sizeof(b));
     if (size == sizeof(Blob)) {
         std::memcpy(&b, data, sizeof(b));
-        if (b.magic != kMagic || b.version != 3) return false;
-    } else if (size == sizeof(BlobV2)) {
-        BlobV2 o;
-        std::memcpy(&o, data, sizeof(o));
-        if (o.magic != kMagic || o.version != 2) return false;
-        std::memcpy(&b, &o, sizeof(o));
-        b.minFreq = 0;
-    } else if (size == sizeof(BlobV1)) {
-        BlobV1 o;
-        std::memcpy(&o, data, sizeof(o));
-        if (o.magic != kMagic || o.version != 1) return false;
-        std::memcpy(&b, &o, sizeof(o));
-        b.exact = 0;
-        b.minFreq = 0;
+        if (b.magic != kMagic || b.version != 4) return false;
+    } else if (size == sizeof(BlobV3) || size == sizeof(BlobV2) || size == sizeof(BlobV1)) {
+        BlobV3 o;
+        std::memset(&o, 0, sizeof(o));
+        std::memcpy(&o, data, size);  // missing trailing fields stay zero
+        const int expectVersion = size == sizeof(BlobV3) ? 3 : (size == sizeof(BlobV2) ? 2 : 1);
+        if (o.magic != kMagic || o.version != expectVersion) return false;
+        const double halfAngle = (o.angle100 / 100.0) * 3.14159265358979323846 / 180.0;
+        b.magic = kMagic;
+        b.version = 4;
+        b.distMm = 1000;
+        b.spacingMm = static_cast<int32_t>(std::lround(2.0 * 1000.0 * std::tan(halfAngle)));
+        b.head100 = o.head100;
+        b.reg1e6 = o.reg1e6;
+        b.boost100 = o.boost100;
+        b.freq = o.freq;
+        b.gain100 = o.gain100;
+        b.autoLevel = o.autoLevel;
+        b.exact = expectVersion >= 2 ? o.exact : 0;
+        b.minFreq = expectVersion >= 3 ? o.minFreq : 0;
     } else {
         return false;
     }
-    p.speakerHalfAngleDeg = b.angle100 / 100.0;
+    p.speakerSpacingCm = b.spacingMm / 10.0;
+    p.listenDistanceCm = b.distMm / 10.0;
     p.headRadiusMm = b.head100 / 100.0;
     p.regularization = b.reg1e6 / 1e6;
     p.maxBoostDb = b.boost100 / 100.0;

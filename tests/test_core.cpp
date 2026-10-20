@@ -52,20 +52,47 @@ static void lowFreqReport(const char* title, const ctc::Params& p, double fs) {
 static int blobTests() {
     int bad = 0;
     ctc::Params p;
-    p.cancelMinHz = 220; p.exactSphere = false; p.speakerHalfAngleDeg = 22.5;
+    p.cancelMinHz = 220; p.exactSphere = false; p.speakerSpacingCm = 120; p.listenDistanceCm = 150;
     settings::Blob b; settings::toBlob(p, b);
     ctc::Params q;
-    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerHalfAngleDeg != 22.5) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
-    settings::BlobV2 v2; std::memcpy(&v2, &b, sizeof(v2)); v2.version = 2;
+    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerSpacingCm != 120 || q.listenDistanceCm != 150) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
+    // Old layouts: half-angle 20 deg -> spacing = 2*tan(20 deg) m at 1 m distance = 72.8 cm.
+    settings::BlobV3 v3 = {settings::kMagic, 3, 2000, 8750, 20000, 1200, 8000, 0, 1, 1, 150};
+    ctc::Params r3;
+    if (!settings::fromBlob(&v3, sizeof(v3), r3) || r3.cancelMinHz != 150 || !r3.exactSphere ||
+        std::fabs(r3.speakerSpacingCm - 72.8) > 0.2 || r3.listenDistanceCm != 100) { std::printf("blob v3 read FAILED\n"); ++bad; }
+    settings::BlobV2 v2 = {settings::kMagic, 2, 2000, 8750, 20000, 1200, 8000, 0, 1, 1};
     ctc::Params r;
-    if (!settings::fromBlob(&v2, sizeof(v2), r) || r.cancelMinHz != 0) { std::printf("blob v2 read FAILED\n"); ++bad; }
-    settings::BlobV1 v1; std::memcpy(&v1, &b, sizeof(v1)); v1.version = 1;
+    if (!settings::fromBlob(&v2, sizeof(v2), r) || r.cancelMinHz != 0 || !r.exactSphere) { std::printf("blob v2 read FAILED\n"); ++bad; }
+    settings::BlobV1 v1 = {settings::kMagic, 1, 2000, 8750, 20000, 1200, 8000, 0, 1};
     ctc::Params s;
     if (!settings::fromBlob(&v1, sizeof(v1), s) || s.cancelMinHz != 0 || s.exactSphere) { std::printf("blob v1 read FAILED\n"); ++bad; }
     char junk[7] = {0};
     if (settings::fromBlob(junk, sizeof(junk), s)) { std::printf("junk blob accepted FAILED\n"); ++bad; }
     std::printf("\nblob tests: %s\n", bad ? "FAILED" : "ok");
     return bad;
+}
+
+static void geometryReport() {
+    std::printf("\n== geometry helpers ==\n");
+    const double sp[] = {55, 120, 30, 200};
+    const double ds[] = {100, 100, 60, 100};
+    for (int i = 0; i < 4; ++i) {
+        ctc::Params p;
+        p.speakerSpacingCm = sp[i];
+        p.listenDistanceCm = ds[i];
+        std::printf("  spacing %3.0f cm, distance %3.0f cm -> half-angle %5.2f deg, head-to-speaker %5.1f cm\n", sp[i], ds[i],
+                    ctc::halfAngleDeg(p), ctc::sourceDistanceM(p) * 100.0);
+    }
+    // Finite distance must tend to the plane-wave model as the distance grows.
+    ctc::Params far;
+    far.speakerSpacingCm = 55;
+    far.listenDistanceCm = 800;
+    ctc::Params near = far;
+    near.listenDistanceCm = 40;
+    std::printf("  contra/ipsi level at 200 Hz: far(8 m) %.2f dB, near(40 cm) %.2f dB\n",
+                [&](const ctc::Params& q) { cd hi, hc; ctc::headModel(q, 200.0, hi, hc); return 20 * std::log10(std::abs(hc / hi)); }(far),
+                [&](const ctc::Params& q) { cd hi, hc; ctc::headModel(q, 200.0, hi, hc); return 20 * std::log10(std::abs(hc / hi)); }(near));
 }
 
 int main() {
@@ -88,6 +115,7 @@ int main() {
         lowFreqReport("lower limit OFF", off, 48000.0);
         lowFreqReport("lower limit 150 Hz (default)", def, 48000.0);
     }
+    geometryReport();
     if (blobTests()) return 1;
 
     // Stability + speed test.

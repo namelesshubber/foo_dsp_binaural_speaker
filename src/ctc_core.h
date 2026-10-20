@@ -30,7 +30,8 @@
 namespace ctc {
 
 struct Params {
-    double speakerHalfAngleDeg = 15.0;  // half of the angle between the speakers, seen from the listener
+    double speakerSpacingCm    = 55.0;  // distance between the two speakers
+    double listenDistanceCm    = 100.0; // distance from the listener to the line joining the speakers
     double headRadiusMm        = 87.5;  // average adult head radius
     double regularization      = 0.02;  // Tikhonov beta; larger = safer/weaker cancellation
     double maxBoostDb          = 12.0;  // hard cap on the gain of each canceller filter
@@ -44,10 +45,19 @@ struct Params {
 // Clamp all parameters to sane ranges.
 void sanitize(Params& p);
 
+// Geometry derived from the spacing and the listening distance (listener centred between the speakers).
+double halfAngleDeg(const Params& p);      // half of the angle between the speakers, clamped to 3..60 deg
+double sourceDistanceM(const Params& p);   // distance from the centre of the head to each speaker, metres
+
 // Pressure transfer function on a rigid sphere (radius a) for a plane wave, at a point whose
 // angle from the source direction is thetaDeg (Rayleigh series, Aaronson & Hartmann 2014, Eq. 2).
 // Phase convention: a delay tau appears as exp(-j*w*tau).
 std::complex<double> sphereExact(double freqHz, double thetaDeg, double radiusM);
+
+// Same as sphereExact for a point source at distanceM from the centre of the sphere
+// (Duda & Martens 1998). Normalised to the free-field pressure at the sphere centre, so it
+// tends to sphereExact() as the distance grows.
+std::complex<double> spherePoint(double freqHz, double thetaDeg, double radiusM, double distanceM);
 
 // Speaker->ear transfer functions of the head model at one frequency.
 // hi: same-side ear, hc: opposite ear (extra ITD delay and head shadow included).
