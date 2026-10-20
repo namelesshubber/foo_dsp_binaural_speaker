@@ -37,10 +37,16 @@ struct Params {
     double cancelMaxHz         = 8000.0;// canceller fades out around this frequency (one octave wide)
     double outputGainDb        = 0.0;   // extra trim
     bool   autoLevel           = true;  // normalise average in-band power gain to 0 dB
+    bool   exactSphere         = true;  // true: rigid-sphere diffraction (Rayleigh series), false: Woodworth + Brown/Duda
 };
 
 // Clamp all parameters to sane ranges.
 void sanitize(Params& p);
+
+// Pressure transfer function on a rigid sphere (radius a) for a plane wave, at a point whose
+// angle from the source direction is thetaDeg (Rayleigh series, Aaronson & Hartmann 2014, Eq. 2).
+// Phase convention: a delay tau appears as exp(-j*w*tau).
+std::complex<double> sphereExact(double freqHz, double thetaDeg, double radiusM);
 
 // Speaker->ear transfer functions of the head model at one frequency.
 // hi: same-side ear, hc: opposite ear (extra ITD delay and head shadow included).

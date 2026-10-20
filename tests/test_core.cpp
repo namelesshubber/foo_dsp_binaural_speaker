@@ -35,8 +35,11 @@ static void report(const char* title, const ctc::Params& p, double fs) {
 }
 
 int main() {
-    ctc::Params def;
-    report("default", def, 48000.0);
+    ctc::Params def;                 // exact sphere model (default)
+    report("default, exact sphere", def, 48000.0);
+    ctc::Params classic = def;
+    classic.exactSphere = false;
+    report("default, classic Woodworth+Brown/Duda", classic, 48000.0);
 
     ctc::Params strong = def;
     strong.regularization = 0.001;

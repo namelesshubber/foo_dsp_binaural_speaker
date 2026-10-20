@@ -16,11 +16,11 @@
 
 DECLARE_COMPONENT_VERSION(
     "Speaker Virtualizer (CMSS-3D Virtual style)",
-    "0.1.0",
+    "0.2.0",
     "Crosstalk canceller (transaural stage) for playing binaural stereo\n"
     "material, such as Dolby Headphone output, over two loudspeakers.\n\n"
-    "Uses an analytic head model (Woodworth ITD + Brown/Duda head shadow)\n"
-    "and a regularised Mid/Side inverse. Not affiliated with Creative.\n\n"
+    "Uses a rigid-sphere head model (exact diffraction series, or the classic\n"
+    "Woodworth + Brown/Duda model) and a regularised Mid/Side inverse. Not affiliated with Creative.\n\n"
     "Source: see README.md in the project repository.");
 
 VALIDATE_COMPONENT_FILENAME("foo_dsp_cmss3d.dll");
@@ -106,6 +106,7 @@ void writeControls(HWND dlg, const ctc::Params& p) {
     setSlider(dlg, IDC_SL_FREQ, 20, 140, static_cast<int>(std::lround(p.cancelMaxHz / 100.0)));
     setSlider(dlg, IDC_SL_GAIN, 0, 36, static_cast<int>(std::lround((p.outputGainDb + 12.0) * 2.0)));
     CheckDlgButton(dlg, IDC_CHK_AUTO, p.autoLevel ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(dlg, IDC_CHK_EXACT, p.exactSphere ? BST_CHECKED : BST_UNCHECKED);
 }
 
 void readControls(HWND dlg, ctc::Params& p) {
@@ -116,6 +117,7 @@ void readControls(HWND dlg, ctc::Params& p) {
     p.cancelMaxHz = getSlider(dlg, IDC_SL_FREQ) * 100.0;
     p.outputGainDb = getSlider(dlg, IDC_SL_GAIN) / 2.0 - 12.0;
     p.autoLevel = IsDlgButtonChecked(dlg, IDC_CHK_AUTO) == BST_CHECKED;
+    p.exactSphere = IsDlgButtonChecked(dlg, IDC_CHK_EXACT) == BST_CHECKED;
     ctc::sanitize(p);
 }
 
@@ -157,6 +159,7 @@ INT_PTR CALLBACK configProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         DlgState* st = reinterpret_cast<DlgState*>(GetWindowLongPtr(dlg, GWLP_USERDATA));
         switch (LOWORD(wp)) {
         case IDC_CHK_AUTO:
+        case IDC_CHK_EXACT:
             if (st) readControls(dlg, st->params);
             return TRUE;
         case IDC_BTN_RESET:

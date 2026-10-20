@@ -19,3 +19,4 @@
 
 #define IDC_CHK_AUTO      1201
 #define IDC_BTN_RESET     1202
+#define IDC_CHK_EXACT     1203
