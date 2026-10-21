@@ -1,0 +1,156 @@
+name: Build foo_dsp_binaural_speaker
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed only to attach files to a GitHub Release when you push a tag
+
+env:
+  # Direct SDK downloads tried in order. If none works, commit the SDK archive
+  # to the repository root as "sdk.7z" (see README.md) and it will be used instead.
+  SDK_URL_1: https://www.foobar2000.org/downloads/SDK-2025-03-07.7z
+  SDK_URL_2: https://www.foobar2000.org/getfile/SDK-2025-03-07.7z
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ Win32, x64 ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Get the foobar2000 SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ws = $env:GITHUB_WORKSPACE
+          $archive = Join-Path $ws 'sdk.7z'
+
+          function Test-7z($path) {
+            if (-not (Test-Path $path)) { return $false }
+            $b = [System.IO.File]::ReadAllBytes($path) | Select-Object -First 6
+            return ($b[0] -eq 0x37 -and $b[1] -eq 0x7A -and $b[2] -eq 0xBC -and $b[3] -eq 0xAF)
+          }
+
+          if (Test-Path (Join-Path $ws 'sdk/pfc')) {
+            Write-Host 'Using SDK folder committed in the repository (sdk/).'
+            $root = Join-Path $ws 'sdk'
+          } else {
+            if (-not (Test-7z $archive)) {
+              Remove-Item $archive -ErrorAction SilentlyContinue
+              foreach ($url in @($env:SDK_URL_1, $env:SDK_URL_2)) {
+                try {
+                  Write-Host "Downloading $url"
+                  Invoke-WebRequest -Uri $url -OutFile $archive -UserAgent 'Mozilla/5.0' -MaximumRedirection 10
+                  if (Test-7z $archive) { break }
+                  Write-Host 'Downloaded file is not a 7z archive, trying next URL.'
+                } catch { Write-Host "Download failed: $_" }
+              }
+            }
+            if (-not (Test-7z $archive)) {
+              throw 'Could not obtain the SDK. Download SDK-xxxx.7z from https://www.foobar2000.org/SDK in your browser and commit it to the repository root as sdk.7z.'
+            }
+            & 7z x $archive -o"$ws\sdk_extracted" -y | Out-Null
+            $pfc = Get-ChildItem "$ws\sdk_extracted" -Directory -Recurse -Filter pfc | Select-Object -First 1
+            if (-not $pfc) { throw 'pfc folder not found inside the SDK archive.' }
+            $root = $pfc.Parent.FullName
+          }
+          Write-Host "SDK root: $root"
+          "SDK_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Locate SDK projects and libraries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:SDK_ROOT
+          Write-Host '--- SDK project and library files ---'
+          Get-ChildItem $root -Recurse -Include *.vcxproj,*.lib | ForEach-Object { Write-Host $_.FullName }
+          Write-Host '-------------------------------------'
+
+          function Find-Proj([string[]]$names) {
+            foreach ($n in $names) {
+              $f = Get-ChildItem $root -Recurse -Filter $n | Select-Object -First 1
+              if ($f) { return $f.FullName.Replace('\','/') }
+            }
+            throw "SDK project not found (tried: $($names -join ', '))"
+          }
+
+          $pfc     = Find-Proj @('pfc.vcxproj')
+          $sdk     = Find-Proj @('foobar2000_SDK.vcxproj')
+          $client  = Find-Proj @('foobar2000_component_client.vcxproj')
+
+          $plat = '${{ matrix.platform }}'
+          $libs = Get-ChildItem $root -Recurse -Filter 'shared*.lib'
+          if ($plat -eq 'x64') { $lib = $libs | Where-Object { $_.Name -match 'x64|64' -and $_.Name -notmatch 'arm' } | Select-Object -First 1 }
+          else                 { $lib = $libs | Where-Object { $_.Name -notmatch '64|arm' } | Select-Object -First 1 }
+          if (-not $lib) { throw "shared*.lib for $plat not found in the SDK." }
+
+          "PFC_PROJ=$pfc"         | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SDK_PROJ=$sdk"         | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CLIENT_PROJ=$client"   | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SHARED_LIB=$($lib.FullName.Replace('\','/'))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $sdkDir = ($env:SDK_ROOT.Replace('\','/')).TrimEnd('/') + '/'
+          msbuild src/foo_dsp_binaural_speaker.vcxproj /m /nologo `
+            /p:Configuration=Release `
+            /p:Platform=${{ matrix.platform }} `
+            /p:PlatformToolset=v143 `
+            /p:WindowsTargetPlatformVersion=10.0 `
+            /p:SolutionDir=$sdkDir `
+            /p:SdkDir=$sdkDir `
+            /p:PfcProj=$env:PFC_PROJ `
+            /p:SdkProj=$env:SDK_PROJ `
+            /p:ClientProj=$env:CLIENT_PROJ `
+            /p:SharedLib=$env:SHARED_LIB
+          if ($LASTEXITCODE -ne 0) { throw "msbuild failed with exit code $LASTEXITCODE" }
+
+      - name: Stage DLL
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "src/out/${{ matrix.platform }}/foo_dsp_binaural_speaker.dll" "dist/foo_dsp_binaural_speaker-${{ matrix.platform }}.dll"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dll-${{ matrix.platform }}
+          path: dist/*.dll
+
+  package:
+    needs: build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: parts
+
+      - name: Create .fb2k-component
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pkg/x64 | Out-Null
+          Copy-Item parts/dll-Win32/foo_dsp_binaural_speaker-Win32.dll pkg/foo_dsp_binaural_speaker.dll
+          Copy-Item parts/dll-x64/foo_dsp_binaural_speaker-x64.dll pkg/x64/foo_dsp_binaural_speaker.dll
+          Compress-Archive -Path pkg/* -DestinationPath foo_dsp_binaural_speaker.zip -Force
+          Move-Item foo_dsp_binaural_speaker.zip foo_dsp_binaural_speaker.fb2k-component -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: foo_dsp_binaural_speaker-component
+          path: foo_dsp_binaural_speaker.fb2k-component
+
+      - name: Attach to GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: foo_dsp_binaural_speaker.fb2k-component
