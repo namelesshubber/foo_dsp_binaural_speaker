@@ -62,7 +62,7 @@ separation at the ears is 20-55 dB between 400 Hz and 7 kHz.
 |---|---|
 | Speaker spacing | Distance between the two speakers (centre to centre of the drivers), in cm. |
 | Listening distance | Distance from your head to the line joining the two speakers, in cm. Spacing and distance give the speaker half-angle (shown in the dialog) and the head-to-speaker distance. Typical desktop: 50 cm spacing at 60-70 cm (about 20-25 deg half-angle). Living room: 200 cm at 200 cm (45 deg). A narrower angle gives a stronger effect but more bass/colour risk. |
-| Head radius | Head size for the model (default 87.5 mm). Calculate the value by dividing the head circumference (in mm) by 6.28. For example: 550 mm ÷ 6.28 = 87.5.|
+| Head radius | Head size for the model (default 87.5 mm). Calculate the value by dividing the head circumference (in mm) by 6.28. For example: 550 mm ÷ 6.28 = 87.5 mm.|
 | Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model, as in v0.1. Presets saved with v0.1 keep the classic model. |
 | Regularization | Higher = safer, less coloured, weaker cancellation. Lower = stronger effect, more colouration. |
 | Max filter boost | Hard cap on the gain of each canceller filter. |
