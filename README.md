@@ -95,8 +95,8 @@ generalised transaural stereo, Brown & Duda (1998) structural head model, Aarons
 J. Acoust. Soc. Am. 135, 817-823) for the Woodworth/rigid-sphere analysis, Duda & Martens (1998, J. Acoust.
 Soc. Am. 104, 3048-3058) for the range dependence of the sphere response, and many patents describing
 HRTF + crosstalk-cancellation virtualizers (for example US 6,009,178, US 8,155,323, US 7,974,418, US 8,050,433).
-This project implements that general technique with its own code. No patent search has been performed
-and no warranty is given regarding third-party patents (see LICENSE).
+This project implements that general technique with its own code. It is provided for personal use
+and is not legal advice regarding any patent.
 
 ## License
 
