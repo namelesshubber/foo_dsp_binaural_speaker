@@ -17,7 +17,7 @@
 
 DECLARE_COMPONENT_VERSION(
     "Binaural Speaker Virtualizer",
-    "0.8.0",
+    "0.7.0",
     "Crosstalk canceller (transaural stage) for playing binaural stereo\n"
     "material over two loudspeakers instead of headphones.\n\n"
     "Uses a rigid-sphere head model (exact diffraction series, or the classic\n"
@@ -112,11 +112,6 @@ void writeControls(HWND dlg, const ctc::Params& p) {
     setSlider(dlg, IDC_SL_GAIN, 0, 36, static_cast<int>(std::lround((p.outputGainDb + 12.0) * 2.0)));
     CheckDlgButton(dlg, IDC_CHK_AUTO, p.autoLevel ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_CHK_EXACT, p.exactSphere ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(dlg, IDC_CHK_STEREO, p.stereoSource ? BST_CHECKED : BST_UNCHECKED);
-    setSlider(dlg, IDC_SL_VIRT, 5, 90, static_cast<int>(std::lround(p.virtualHalfAngleDeg)));
-    // The virtual speaker angle only matters in stereo source mode.
-    EnableWindow(GetDlgItem(dlg, IDC_SL_VIRT), p.stereoSource ? TRUE : FALSE);
-    EnableWindow(GetDlgItem(dlg, IDC_TX_VIRT), p.stereoSource ? TRUE : FALSE);
 }
 
 void readControls(HWND dlg, ctc::Params& p) {
@@ -131,8 +126,6 @@ void readControls(HWND dlg, ctc::Params& p) {
     p.outputGainDb = getSlider(dlg, IDC_SL_GAIN) / 2.0 - 12.0;
     p.autoLevel = IsDlgButtonChecked(dlg, IDC_CHK_AUTO) == BST_CHECKED;
     p.exactSphere = IsDlgButtonChecked(dlg, IDC_CHK_EXACT) == BST_CHECKED;
-    p.stereoSource = IsDlgButtonChecked(dlg, IDC_CHK_STEREO) == BST_CHECKED;
-    p.virtualHalfAngleDeg = getSlider(dlg, IDC_SL_VIRT);
     ctc::sanitize(p);
 }
 
@@ -159,8 +152,6 @@ void updateLabels(HWND dlg, const ctc::Params& p) {
     SetDlgItemTextW(dlg, IDC_TX_LOW, buf);
     swprintf_s(buf, L"%.1f kHz", p.cancelMaxHz / 1000.0);
     SetDlgItemTextW(dlg, IDC_TX_FREQ, buf);
-    swprintf_s(buf, L"%.0f deg", p.virtualHalfAngleDeg);
-    SetDlgItemTextW(dlg, IDC_TX_VIRT, buf);
     swprintf_s(buf, L"%+.1f dB", p.centerGainDb);
     SetDlgItemTextW(dlg, IDC_TX_CENTER, buf);
     swprintf_s(buf, L"%+.1f dB", p.outputGainDb);
@@ -191,13 +182,6 @@ INT_PTR CALLBACK configProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_CHK_AUTO:
         case IDC_CHK_EXACT:
             if (st) readControls(dlg, st->params);
-            return TRUE;
-        case IDC_CHK_STEREO:
-            if (st) {
-                readControls(dlg, st->params);
-                EnableWindow(GetDlgItem(dlg, IDC_SL_VIRT), st->params.stereoSource ? TRUE : FALSE);
-                EnableWindow(GetDlgItem(dlg, IDC_TX_VIRT), st->params.stereoSource ? TRUE : FALSE);
-            }
             return TRUE;
         case IDC_BTN_RESET:
             if (st) {
