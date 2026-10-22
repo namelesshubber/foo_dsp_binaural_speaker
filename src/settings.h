@@ -12,13 +12,13 @@ namespace settings {
 
 static const int32_t kMagic = 0x31435443;  // "CTC1" little endian
 
-// Current layout (version 5).
+// Current layout (version 6). Version 5 has the same layout but stores the head RADIUS in head100.
 struct Blob {
     int32_t magic;      // 'CTC1'
-    int32_t version;    // 5
+    int32_t version;    // 6
     int32_t spacingMm;  // distance between the speakers, mm
     int32_t distMm;     // listening distance, mm
-    int32_t head100;    // head radius, 0.01 mm
+    int32_t head100;    // head circumference, 0.01 cm (versions <= 5: head radius, 0.01 mm)
     int32_t reg1e6;     // regularisation * 1e6
     int32_t boost100;   // max boost, 0.01 dB
     int32_t freq;       // canceller upper frequency, Hz
@@ -48,10 +48,10 @@ inline int32_t toFix(double v, double scale) { return static_cast<int32_t>(std::
 
 inline void toBlob(const ctc::Params& p, Blob& b) {
     b.magic = kMagic;
-    b.version = 5;
+    b.version = 6;
     b.spacingMm = toFix(p.speakerSpacingCm, 10.0);
     b.distMm = toFix(p.listenDistanceCm, 10.0);
-    b.head100 = toFix(p.headRadiusMm, 100.0);
+    b.head100 = toFix(p.headCircumferenceCm, 100.0);
     b.reg1e6 = toFix(p.regularization, 1e6);
     b.boost100 = toFix(p.maxBoostDb, 100.0);
     b.freq = toFix(p.cancelMaxHz, 1.0);
@@ -70,9 +70,11 @@ inline bool fromBlob(const void* data, std::size_t size, ctc::Params& p) {
     if (!data) return false;
     Blob b;
     std::memset(&b, 0, sizeof(b));
+    bool headIsRadius = true;  // older layouts stored the head radius
     if (size == sizeof(Blob)) {
         std::memcpy(&b, data, sizeof(b));
-        if (b.magic != kMagic || b.version != 5) return false;
+        if (b.magic != kMagic || (b.version != 5 && b.version != 6)) return false;
+        headIsRadius = b.version == 5;
     } else if (size == sizeof(BlobV4)) {
         BlobV4 o;
         std::memcpy(&o, data, sizeof(o));
@@ -104,7 +106,10 @@ inline bool fromBlob(const void* data, std::size_t size, ctc::Params& p) {
     }
     p.speakerSpacingCm = b.spacingMm / 10.0;
     p.listenDistanceCm = b.distMm / 10.0;
-    p.headRadiusMm = b.head100 / 100.0;
+    if (headIsRadius)
+        p.headCircumferenceCm = 2.0 * 3.14159265358979323846 * (b.head100 / 100.0) / 10.0;  // mm -> cm
+    else
+        p.headCircumferenceCm = b.head100 / 100.0;
     p.regularization = b.reg1e6 / 1e6;
     p.maxBoostDb = b.boost100 / 100.0;
     p.cancelMaxHz = static_cast<double>(b.freq);

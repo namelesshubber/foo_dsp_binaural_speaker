@@ -64,14 +64,21 @@ static void centerReport() {
 static int blobTests() {
     int bad = 0;
     ctc::Params p;
-    p.cancelMinHz = 220; p.exactSphere = false; p.speakerSpacingCm = 120; p.listenDistanceCm = 150; p.centerGainDb = 4.5;
+    p.cancelMinHz = 220; p.exactSphere = false; p.speakerSpacingCm = 120; p.listenDistanceCm = 150; p.centerGainDb = 4.5; p.headCircumferenceCm = 57.5;
     settings::Blob b; settings::toBlob(p, b);
     ctc::Params q;
-    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerSpacingCm != 120 || q.listenDistanceCm != 150 || std::fabs(q.centerGainDb - 4.5) > 1e-9) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
+    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerSpacingCm != 120 || q.listenDistanceCm != 150 || std::fabs(q.centerGainDb - 4.5) > 1e-9 || std::fabs(q.headCircumferenceCm - 57.5) > 1e-9) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
     settings::BlobV4 v4 = {settings::kMagic, 4, 550, 1000, 8750, 20000, 1200, 8000, 0, 1, 1, 150};
     ctc::Params r4;
     if (!settings::fromBlob(&v4, sizeof(v4), r4) || r4.centerGainDb != 0 || r4.cancelMinHz != 150 ||
         std::fabs(r4.speakerSpacingCm - 55.0) > 1e-9) { std::printf("blob v4 read FAILED\n"); ++bad; }
+    // Version 5 stored the head RADIUS (8750 = 87.5 mm): 2*pi*8.75 cm = 54.98 cm.
+    settings::Blob v5; settings::toBlob(p, v5); v5.version = 5; v5.head100 = 8750;
+    ctc::Params r5;
+    if (!settings::fromBlob(&v5, sizeof(v5), r5) || std::fabs(r5.headCircumferenceCm - 54.978) > 0.01 ||
+        std::fabs(ctc::headRadiusMm(r5) - 87.5) > 0.05) { std::printf("blob v5 read FAILED\n"); ++bad; }
+    ctc::Params dflt;
+    if (std::fabs(ctc::headRadiusMm(dflt) - 87.54) > 0.05) { std::printf("default radius FAILED (%f)\n", ctc::headRadiusMm(dflt)); ++bad; }
     // Old layouts: half-angle 20 deg -> spacing = 2*tan(20 deg) m at 1 m distance = 72.8 cm.
     settings::BlobV3 v3 = {settings::kMagic, 3, 2000, 8750, 20000, 1200, 8000, 0, 1, 1, 150};
     ctc::Params r3;

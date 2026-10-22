@@ -17,7 +17,7 @@
 
 DECLARE_COMPONENT_VERSION(
     "Binaural Speaker Virtualizer",
-    "0.6.0",
+    "0.7.0",
     "Crosstalk canceller (transaural stage) for playing binaural stereo\n"
     "material over two loudspeakers instead of headphones.\n\n"
     "Uses a rigid-sphere head model (exact diffraction series, or the classic\n"
@@ -103,7 +103,7 @@ int getSlider(HWND dlg, int id) { return static_cast<int>(SendDlgItemMessage(dlg
 void writeControls(HWND dlg, const ctc::Params& p) {
     setSlider(dlg, IDC_SL_SPACING, 10, 400, static_cast<int>(std::lround(p.speakerSpacingCm)));
     setSlider(dlg, IDC_SL_DIST, 25, 500, static_cast<int>(std::lround(p.listenDistanceCm)));
-    setSlider(dlg, IDC_SL_HEAD, 70, 100, static_cast<int>(std::lround(p.headRadiusMm)));
+    setSlider(dlg, IDC_SL_HEAD, 0, 38, static_cast<int>(std::lround((p.headCircumferenceCm - 44.0) * 2.0)));
     setSlider(dlg, IDC_SL_REG, 0, 300, static_cast<int>(std::lround((std::log10(p.regularization) + 3.0) * 100.0)));
     setSlider(dlg, IDC_SL_BOOST, 0, 20, static_cast<int>(std::lround(p.maxBoostDb)));
     setSlider(dlg, IDC_SL_LOW, 0, 50, static_cast<int>(std::lround(p.cancelMinHz / 10.0)));
@@ -117,7 +117,7 @@ void writeControls(HWND dlg, const ctc::Params& p) {
 void readControls(HWND dlg, ctc::Params& p) {
     p.speakerSpacingCm = getSlider(dlg, IDC_SL_SPACING);
     p.listenDistanceCm = getSlider(dlg, IDC_SL_DIST);
-    p.headRadiusMm = getSlider(dlg, IDC_SL_HEAD);
+    p.headCircumferenceCm = 44.0 + getSlider(dlg, IDC_SL_HEAD) / 2.0;
     p.regularization = std::pow(10.0, -3.0 + getSlider(dlg, IDC_SL_REG) / 100.0);
     p.maxBoostDb = getSlider(dlg, IDC_SL_BOOST);
     p.cancelMinHz = getSlider(dlg, IDC_SL_LOW) * 10.0;
@@ -136,10 +136,10 @@ void updateLabels(HWND dlg, const ctc::Params& p) {
     swprintf_s(buf, L"%.0f cm", p.listenDistanceCm);
     SetDlgItemTextW(dlg, IDC_TX_DIST, buf);
     wchar_t geom[128];
-    swprintf_s(geom, L"Speaker half-angle %.1f deg, distance head-to-speaker %.0f cm", ctc::halfAngleDeg(p),
-               ctc::sourceDistanceM(p) * 100.0);
+    swprintf_s(geom, L"Half-angle %.1f deg, head-to-speaker %.0f cm, head radius %.1f mm", ctc::halfAngleDeg(p),
+               ctc::sourceDistanceM(p) * 100.0, ctc::headRadiusMm(p));
     SetDlgItemTextW(dlg, IDC_TX_GEOM, geom);
-    swprintf_s(buf, L"%.0f mm", p.headRadiusMm);
+    swprintf_s(buf, L"%.1f cm", p.headCircumferenceCm);
     SetDlgItemTextW(dlg, IDC_TX_HEAD, buf);
     swprintf_s(buf, L"%.3f", p.regularization);
     SetDlgItemTextW(dlg, IDC_TX_REG, buf);

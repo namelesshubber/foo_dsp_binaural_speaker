@@ -13,6 +13,8 @@ static const double kSpeedOfSound = 343.0;  // m/s
 
 static double clampd(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+double headRadiusMm(const Params& p) { return p.headCircumferenceCm * 10.0 / (2.0 * kPi); }
+
 double halfAngleDeg(const Params& p) {
     const double deg = std::atan((p.speakerSpacingCm * 0.5) / p.listenDistanceCm) * 180.0 / kPi;
     return clampd(deg, 3.0, 60.0);
@@ -26,7 +28,7 @@ double sourceDistanceM(const Params& p) {
 void sanitize(Params& p) {
     p.speakerSpacingCm    = clampd(p.speakerSpacingCm, 10.0, 500.0);
     p.listenDistanceCm    = clampd(p.listenDistanceCm, 25.0, 800.0);
-    p.headRadiusMm        = clampd(p.headRadiusMm, 70.0, 100.0);
+    p.headCircumferenceCm = clampd(p.headCircumferenceCm, 44.0, 63.0);
     p.regularization      = clampd(p.regularization, 0.001, 1.0);
     p.maxBoostDb          = clampd(p.maxBoostDb, 0.0, 20.0);
     p.cancelMinHz         = clampd(p.cancelMinHz, 0.0, 500.0);
@@ -121,7 +123,7 @@ cd spherePoint(double f, double thetaDeg, double radius, double dist) {
 }
 
 void headModel(const Params& p, double f, cd& hi, cd& hc) {
-    const double a = p.headRadiusMm * 1e-3;
+    const double a = headRadiusMm(p) * 1e-3;
     const double phi = halfAngleDeg(p);
     const double omega = 2.0 * kPi * f;
     const double earAxis = 100.0;  // ears sit at +/-100 degrees on the head axis

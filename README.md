@@ -62,13 +62,13 @@ separation at the ears is 20-55 dB between 400 Hz and 7 kHz.
 |---|---|
 | Speaker spacing | Distance between the two speakers (centre to centre of the drivers), in cm. |
 | Listening distance | Distance from your head to the line joining the two speakers, in cm. Spacing and distance give the speaker half-angle (shown in the dialog) and the head-to-speaker distance. Typical desktop: 50 cm spacing at 60-70 cm (about 20-25 deg half-angle). Living room: 200 cm at 200 cm (45 deg). A narrower angle gives a stronger effect but more bass/colour risk. |
-| Head radius | Head size for the model (default 87 mm). Calculate the value by dividing the head circumference (in mm) by 6.28. For example: 550 mm ÷ 6.28 = 87 mm.|
-| Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model, as in v0.1. Presets saved with v0.1 keep the classic model. |
+| Head circumference | Your head size, in cm (default 55 cm). Measure with a tape measure (or a piece of string, then measure the string): around the head just above the eyebrows and above the ears, where the head is widest. Typical adults are about 54-58 cm. The model uses a sphere of radius C / (2 pi), so 55 cm corresponds to the standard 87.5 mm; the dialog shows the resulting radius. |
+| Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model.|
 | Regularization | Higher = safer, less coloured, weaker cancellation. Lower = stronger effect, more colouration. |
 | Max filter boost | Hard cap on the gain of each canceller filter. |
-| Canceller lower limit | Below this frequency (default 150 Hz, one octave wide transition) the filters fade back to unity, so the bass is the same as with the DSP switched off. 0 = off (cancel down to DC, as in v0.1/v0.2). |
+| Canceller lower limit | Below this frequency (default 150 Hz, one octave wide transition) the filters fade back to unity, so the bass is the same as with the DSP switched off. 0 = off (cancel down to DC). |
 | Canceller upper limit | Cancellation fades out around this frequency (one octave wide transition). |
-| Center level | Extra gain (-12..+12 dB) on the Mid component, i.e. what is common to both channels: the phantom centre of stereo material, vocals, dialogue. It acts only inside the cancellation band (it fades out with the lower and upper limits), so bass and treble are untouched. The canceller lowers the Mid component by about 6 dB in the voice range relative to the Side component, which can make centred voices small and distant; try +3 to +6 dB. Raising it also raises the overall level, so lower Output gain if needed. |
+| Center level | Extra gain (-12 to +12 dB) on the Mid component, i.e. what is common to both channels: the phantom centre of stereo material, vocals, dialogue. It acts only inside the cancellation band (it fades out with the lower and upper limits), so bass and treble are untouched. The canceller lowers the Mid component by about 6 dB in the voice range relative to the Side component, which can make centred voices small and distant; try +3 to +6 dB. Raising it also raises the overall level, so lower Output gain if needed. |
 | Output gain / Auto level | Level compensation. Auto level normalises the average 200 Hz-8 kHz power gain to 0 dB. |
 
 The effect works only near the sweet spot (centred, ears level with the speakers, speakers

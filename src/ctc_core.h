@@ -32,7 +32,7 @@ namespace ctc {
 struct Params {
     double speakerSpacingCm    = 55.0;  // distance between the two speakers
     double listenDistanceCm    = 100.0; // distance from the listener to the line joining the speakers
-    double headRadiusMm        = 87.5;  // average adult head radius
+    double headCircumferenceCm = 55.0;  // head circumference; the sphere radius is C / (2 pi) (55 cm -> 87.5 mm)
     double regularization      = 0.02;  // Tikhonov beta; larger = safer/weaker cancellation
     double maxBoostDb          = 12.0;  // hard cap on the gain of each canceller filter
     double cancelMinHz         = 150.0; // below this the canceller fades back to plain stereo (0 = off)
@@ -45,6 +45,9 @@ struct Params {
 
 // Clamp all parameters to sane ranges.
 void sanitize(Params& p);
+
+// Radius of the spherical head model in millimetres, derived from the circumference.
+double headRadiusMm(const Params& p);
 
 // Geometry derived from the spacing and the listening distance (listener centred between the speakers).
 double halfAngleDeg(const Params& p);      // half of the angle between the speakers, clamped to 3..60 deg

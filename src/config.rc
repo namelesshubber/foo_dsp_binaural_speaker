@@ -18,7 +18,7 @@ BEGIN
     CONTROL         "", IDC_SL_DIST, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 47, 140, 16
     LTEXT           "", IDC_TX_DIST, 244, 50, 52, 10
 
-    LTEXT           "Head radius", -1, 8, 70, 90, 10
+    LTEXT           "Head circumference", -1, 8, 70, 90, 10
     CONTROL         "", IDC_SL_HEAD, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 67, 140, 16
     LTEXT           "", IDC_TX_HEAD, 244, 70, 52, 10
 
