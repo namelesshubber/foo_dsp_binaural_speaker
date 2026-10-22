@@ -35,6 +35,7 @@ void sanitize(Params& p) {
     p.cancelMaxHz         = clampd(p.cancelMaxHz, 2000.0, 14000.0);
     p.outputGainDb        = clampd(p.outputGainDb, -12.0, 6.0);
     p.centerGainDb        = clampd(p.centerGainDb, -12.0, 12.0);
+    p.virtualHalfAngleDeg = clampd(p.virtualHalfAngleDeg, 5.0, 90.0);
 }
 
 // Brown & Duda (1998) head-shadow filter for a given angle of incidence
@@ -122,9 +123,10 @@ cd spherePoint(double f, double thetaDeg, double radius, double dist) {
     return sum * (xr / (x * x)) * std::exp(cd(0.0, xr));
 }
 
-void headModel(const Params& p, double f, cd& hi, cd& hc) {
+void headModel(const Params& p, double f, cd& hi, cd& hc) { headModelAt(p, f, halfAngleDeg(p), hi, hc); }
+
+void headModelAt(const Params& p, double f, double phi, cd& hi, cd& hc) {
     const double a = headRadiusMm(p) * 1e-3;
-    const double phi = halfAngleDeg(p);
     const double omega = 2.0 * kPi * f;
     const double earAxis = 100.0;  // ears sit at +/-100 degrees on the head axis
 
@@ -263,6 +265,16 @@ Design designFilters(const Params& pin, double fs) {
         const cd hd = hi - hc;
         cd a = std::conj(hs) / (std::norm(hs) + p.regularization);
         cd b = std::conj(hd) / (std::norm(hd) + p.regularization);
+        if (p.stereoSource) {
+            // Ordinary stereo: first render the signal through virtual speakers at +/-virtualHalfAngle
+            // (what the ears would hear from them), then apply the canceller for the real speakers.
+            // Both steps are diagonal in the Mid/Side basis, so the chain is one filter per channel:
+            //   Mid  = (Hi_v + Hc_v) / (Hi_p + Hc_p),   Side = (Hi_v - Hc_v) / (Hi_p - Hc_p)   (regularised).
+            cd hiV, hcV;
+            headModelAt(p, f, p.virtualHalfAngleDeg, hiV, hcV);
+            a *= hiV + hcV;
+            b *= hiV - hcV;
+        }
         a = limitGain(a, cap);
         b = limitGain(b, cap);
         // The final filters are minimum-phase and built from the magnitude only, so the band

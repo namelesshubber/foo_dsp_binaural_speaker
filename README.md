@@ -18,7 +18,23 @@ recordings, or surround content rendered to binaural by a headphone-virtualizer 
 the DSP chain). Its job is the second half of a speaker-based virtual surround system: making each
 ear receive, as far as possible, only its own binaural channel.
 Put it **after** the binaural renderer in the DSP chain. Do not use it together with headphones.
-It only processes 2-channel (binaural) audio; other layouts pass through untouched.
+It only processes 2-channel audio; other layouts pass through untouched.
+
+### Ordinary (non-binaural) stereo: "Stereo source" mode
+
+With the mode **off** (default) the DSP assumes a binaural input, as described above. Ordinary stereo
+recordings can also be played through it as they are; the result is a very wide, headphone-like
+image, because each channel is treated as the signal for one ear.
+
+With **Stereo source** enabled, the DSP first renders the stereo signal through *virtual speakers* at
++/- *Virtual speaker angle* (default 30 deg, the usual mixing position) and then applies the canceller
+for your real speakers. This is what a crossfeed (such as the Bauer stereophonic-to-binaural DSP) does for
+headphones, but computed from the same head model, distance and head size used by the canceller. Because
+both steps are diagonal in the Mid/Side basis, the whole chain is still one filter per channel:
+Mid = (Hi_v + Hc_v) / (Hi_p + Hc_p), Side = (Hi_v - Hc_v) / (Hi_p - Hc_p) (regularised; v = virtual speakers,
+p = real speakers). If the virtual angle equals the real half-angle the chain does nothing; a larger
+virtual angle widens the stage, a smaller one narrows it. The sphere model has no pinnae or room,
+so the virtual front stage is correct but plain.
 
 ## How it works
 
@@ -36,9 +52,9 @@ The Mid/Side transform diagonalises it, so the inverse is two filters:
 
 `Hi` and `Hc` come from a head model (no HRTF database needed). Two models are available:
 
-* **Exact rigid sphere (default):** the Rayleigh partial-wave series for a plane wave on a
+* **Exact rigid sphere (default since v0.2):** the Rayleigh partial-wave series for a plane wave on a
   rigid sphere (Aaronson & Hartmann 2014, Eq. 2), evaluated at the two ear positions (ear axis at 100 deg).
-  The speakers are treated as point sources at their real distance (Duda & Martens 1998), so the
+  Since v0.4 the speakers are treated as point sources at their real distance (Duda & Martens 1998), so the
   level and phase difference between the ears at low frequencies follows the distance you enter. At 200 Hz the
   contralateral/ipsilateral level ratio is about -0.7 dB at 1 m and -1.7 dB at 40 cm, compared with 0 dB for a
   plane wave; that matters because the cancellation depends on small differences there.
@@ -62,13 +78,15 @@ separation at the ears is 20-55 dB between 400 Hz and 7 kHz.
 |---|---|
 | Speaker spacing | Distance between the two speakers (centre to centre of the drivers), in cm. |
 | Listening distance | Distance from your head to the line joining the two speakers, in cm. Spacing and distance give the speaker half-angle (shown in the dialog) and the head-to-speaker distance. Typical desktop: 50 cm spacing at 60-70 cm (about 20-25 deg half-angle). Living room: 200 cm at 200 cm (45 deg). A narrower angle gives a stronger effect but more bass/colour risk. |
-| Head circumference | Your head size, in cm (default 55 cm). Measure with a tape measure (or a piece of string, then measure the string): around the head just above the eyebrows and above the ears, where the head is widest. Typical adults are about 54-58 cm. The model uses a sphere of radius C / (2 pi), so 55 cm corresponds to the standard 87.5 mm; the dialog shows the resulting radius. |
-| Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model.|
+| Head circumference | Your head size, in cm (default 55 cm). Measure with a tape measure or a piece of string, then measure the string: around the head just above the eyebrows and above the ears, where the head is widest. Typical adults are about 54-58 cm. The model uses a sphere of radius C / (2 pi), so 55 cm corresponds to the standard 87.5 mm; the dialog shows the resulting radius. A small error changes the result very little. |
+| Exact rigid-sphere model | On (default): exact diffraction series. Off: classic Woodworth + Brown/Duda model. |
 | Regularization | Higher = safer, less coloured, weaker cancellation. Lower = stronger effect, more colouration. |
 | Max filter boost | Hard cap on the gain of each canceller filter. |
 | Canceller lower limit | Below this frequency (default 150 Hz, one octave wide transition) the filters fade back to unity, so the bass is the same as with the DSP switched off. 0 = off (cancel down to DC). |
 | Canceller upper limit | Cancellation fades out around this frequency (one octave wide transition). |
 | Center level | Extra gain (-12 to +12 dB) on the Mid component, i.e. what is common to both channels: the phantom centre of stereo material, vocals, dialogue. It acts only inside the cancellation band (it fades out with the lower and upper limits), so bass and treble are untouched. The canceller lowers the Mid component by about 6 dB in the voice range relative to the Side component, which can make centred voices small and distant; try +3 to +6 dB. Raising it also raises the overall level, so lower Output gain if needed. |
+| Stereo source | Off (default): binaural input, standard behaviour. On: ordinary stereo input, rendered through virtual speakers before the canceller (see above). |
+| Virtual speaker angle | Half-angle of the virtual speakers in Stereo source mode (5-90 deg, default 30). Only active when Stereo source is on. |
 | Output gain / Auto level | Level compensation. Auto level normalises the average 200 Hz-8 kHz power gain to 0 dB. |
 
 The effect works only near the sweet spot (centred, ears level with the speakers, speakers
@@ -77,6 +95,7 @@ toed in towards you) and in a room with limited early reflections. Leave some he
 
 ## Installing
 
+* If you used this component under its old name (`foo_dsp_cmss3d`), remove it first (Preferences -> Components -> select it -> Uninstall, or delete its folder from `user-components`) and restart; both versions use the same DSP identifier, so your DSP chain and presets carry over to the new one.
 * Double-click `foo_dsp_binaural_speaker.fb2k-component`, or in foobar2000 go to
   *Preferences -> Components -> Install...*, then restart foobar2000.
 * Manual install (portable or classic): put `foo_dsp_binaural_speaker.dll` into
@@ -95,8 +114,7 @@ generalised transaural stereo, Brown & Duda (1998) structural head model, Aarons
 J. Acoust. Soc. Am. 135, 817-823) for the Woodworth/rigid-sphere analysis, Duda & Martens (1998, J. Acoust.
 Soc. Am. 104, 3048-3058) for the range dependence of the sphere response, and many patents describing
 HRTF + crosstalk-cancellation virtualizers (for example US 6,009,178, US 8,155,323, US 7,974,418, US 8,050,433).
-This project implements that general technique with its own code. It is provided for personal use
-and is not legal advice regarding any patent.
+This project implements that general technique with its own code.
 
 ## License
 

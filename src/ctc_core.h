@@ -40,6 +40,8 @@ struct Params {
     double outputGainDb        = 0.0;   // extra trim
     double centerGainDb        = 0.0;  // extra gain on the Mid (centre/phantom image) component, inside the cancellation band only
     bool   autoLevel           = true;  // normalise average in-band power gain to 0 dB
+    bool   stereoSource        = false; // true: input is ordinary stereo, rendered through virtual speakers first
+    double virtualHalfAngleDeg = 30.0;  // half-angle of the virtual speakers (stereoSource only)
     bool   exactSphere         = true;  // true: rigid-sphere diffraction (Rayleigh series), false: Woodworth + Brown/Duda
 };
 
@@ -66,6 +68,9 @@ std::complex<double> spherePoint(double freqHz, double thetaDeg, double radiusM,
 // Speaker->ear transfer functions of the head model at one frequency.
 // hi: same-side ear, hc: opposite ear (extra ITD delay and head shadow included).
 void headModel(const Params& p, double freqHz, std::complex<double>& hi, std::complex<double>& hc);
+
+// Same, for a speaker pair with an explicit half-angle (degrees) at the distance given by the parameters.
+void headModelAt(const Params& p, double freqHz, double halfAngleDeg, std::complex<double>& hi, std::complex<double>& hc);
 
 struct Design {
     int taps = 0;

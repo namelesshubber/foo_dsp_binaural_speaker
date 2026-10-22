@@ -49,6 +49,35 @@ static void lowFreqReport(const char* title, const ctc::Params& p, double fs) {
     }
 }
 
+static void stereoModeReport() {
+    std::printf("\n== stereo source mode: Mid/Side gain of the chain (dB), weak regularisation, no band limits ==\n");
+    std::printf("   (Python reference, unregularised: 30 deg: 200Hz -0.1/5.5  500Hz -0.9/5.3  1k -3.9/4.6  2k -1.6/1.2  3k 11.6/-5.7)\n");
+    for (double virt : {15.38, 30.0}) {
+        ctc::Params p;                       // 55 cm at 100 cm: real half-angle 15.38 deg
+        p.stereoSource = true;
+        p.virtualHalfAngleDeg = virt;
+        p.regularization = 0.001;
+        p.maxBoostDb = 20;
+        p.cancelMinHz = 0;
+        p.cancelMaxHz = 14000;
+        p.autoLevel = false;
+        p.exactSphere = true;
+        ctc::Design d = ctc::designFilters(p, 48000.0);
+        std::printf("  virtual half-angle %5.2f deg:", virt);
+        for (double f : {200.0, 500.0, 1000.0, 2000.0, 3000.0})
+            std::printf("  %5.0fHz %5.1f/%5.1f", f, 20 * std::log10(std::abs(response(d.mid, f, 48000.0))),
+                        20 * std::log10(std::abs(response(d.side, f, 48000.0))));
+        std::printf("\n");
+    }
+    // The mode must be a no-op for the standard (binaural) behaviour: same filters as with it off.
+    ctc::Params off, on = off;
+    on.stereoSource = true;
+    ctc::Design a = ctc::designFilters(off, 48000.0), b = ctc::designFilters(on, 48000.0);
+    double diff = 0;
+    for (size_t i = 0; i < a.mid.size(); ++i) diff += std::fabs(a.mid[i] - b.mid[i]);
+    std::printf("  (sanity) stereo mode ON differs from OFF: %s\n", diff > 1e-6 ? "yes" : "NO - BUG");
+}
+
 static void centerReport() {
     std::printf("\n== centre level: Gmid change vs centre=0 (dB), Gside must not change ==\n");
     ctc::Params base, up = base;
@@ -64,18 +93,22 @@ static void centerReport() {
 static int blobTests() {
     int bad = 0;
     ctc::Params p;
-    p.cancelMinHz = 220; p.exactSphere = false; p.speakerSpacingCm = 120; p.listenDistanceCm = 150; p.centerGainDb = 4.5; p.headCircumferenceCm = 57.5;
+    p.cancelMinHz = 220; p.exactSphere = false; p.speakerSpacingCm = 120; p.listenDistanceCm = 150; p.centerGainDb = 4.5; p.headCircumferenceCm = 57.5; p.stereoSource = true; p.virtualHalfAngleDeg = 42.5;
     settings::Blob b; settings::toBlob(p, b);
     ctc::Params q;
-    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerSpacingCm != 120 || q.listenDistanceCm != 150 || std::fabs(q.centerGainDb - 4.5) > 1e-9 || std::fabs(q.headCircumferenceCm - 57.5) > 1e-9) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
+    if (!settings::fromBlob(&b, sizeof(b), q) || q.cancelMinHz != 220 || q.exactSphere || q.speakerSpacingCm != 120 || q.listenDistanceCm != 150 || std::fabs(q.centerGainDb - 4.5) > 1e-9 || std::fabs(q.headCircumferenceCm - 57.5) > 1e-9 || !q.stereoSource || std::fabs(q.virtualHalfAngleDeg - 42.5) > 1e-9) { std::printf("blob v3 roundtrip FAILED\n"); ++bad; }
     settings::BlobV4 v4 = {settings::kMagic, 4, 550, 1000, 8750, 20000, 1200, 8000, 0, 1, 1, 150};
     ctc::Params r4;
     if (!settings::fromBlob(&v4, sizeof(v4), r4) || r4.centerGainDb != 0 || r4.cancelMinHz != 150 ||
         std::fabs(r4.speakerSpacingCm - 55.0) > 1e-9) { std::printf("blob v4 read FAILED\n"); ++bad; }
-    // Version 5 stored the head RADIUS (8750 = 87.5 mm): 2*pi*8.75 cm = 54.98 cm.
-    settings::Blob v5; settings::toBlob(p, v5); v5.version = 5; v5.head100 = 8750;
+    // Version 6 (circumference, no stereo mode) and version 5 (head RADIUS 87.5 mm = 54.98 cm).
+    settings::BlobV6 v6 = {settings::kMagic, 6, 550, 1000, 5750, 20000, 1200, 8000, 0, 1, 1, 150, 300};
+    ctc::Params r6;
+    if (!settings::fromBlob(&v6, sizeof(v6), r6) || r6.stereoSource || std::fabs(r6.headCircumferenceCm - 57.5) > 1e-9 ||
+        r6.centerGainDb != 3.0) { std::printf("blob v6 read FAILED\n"); ++bad; }
+    settings::BlobV6 v5 = v6; v5.version = 5; v5.head100 = 8750;
     ctc::Params r5;
-    if (!settings::fromBlob(&v5, sizeof(v5), r5) || std::fabs(r5.headCircumferenceCm - 54.978) > 0.01 ||
+    if (!settings::fromBlob(&v5, sizeof(v5), r5) || r5.stereoSource || std::fabs(r5.headCircumferenceCm - 54.978) > 0.01 ||
         std::fabs(ctc::headRadiusMm(r5) - 87.5) > 0.05) { std::printf("blob v5 read FAILED\n"); ++bad; }
     ctc::Params dflt;
     if (std::fabs(ctc::headRadiusMm(dflt) - 87.54) > 0.05) { std::printf("default radius FAILED (%f)\n", ctc::headRadiusMm(dflt)); ++bad; }
@@ -140,6 +173,7 @@ int main() {
     }
     geometryReport();
     centerReport();
+    stereoModeReport();
     if (blobTests()) return 1;
 
     // Stability + speed test.

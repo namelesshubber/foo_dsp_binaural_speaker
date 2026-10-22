@@ -11,6 +11,7 @@
 #define IDC_SL_FREQ       1005
 #define IDC_SL_GAIN       1006
 #define IDC_SL_CENTER     1009
+#define IDC_SL_VIRT       1010
 #define IDC_SL_LOW        1007
 
 #define IDC_TX_SPACING    1101
@@ -21,9 +22,11 @@
 #define IDC_TX_FREQ       1105
 #define IDC_TX_GAIN       1106
 #define IDC_TX_CENTER     1109
+#define IDC_TX_VIRT       1110
 #define IDC_TX_LOW        1107
 
 #define IDC_CHK_AUTO      1201
 #define IDC_BTN_RESET     1202
 #define IDC_CHK_EXACT     1203
 #define IDC_TX_GEOM       1204
+#define IDC_CHK_STEREO    1205
